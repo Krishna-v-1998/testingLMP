@@ -1,0 +1,59 @@
+SPRINKLER LEAKAGE ENDORSEMENT
+Form Number: BR-END-SPR-002
+Edition: 01/2024
+================================================================================
+
+This endorsement modifies insurance provided under:
+  BUILDERS RISK COVERAGE FORM (BR-001)
+
+================================================================================
+SCHEDULE
+================================================================================
+
+  Named Insured:  {{Named Insured}}
+  Policy Number:  {{Policy Number}}
+  Effective Date: {{Effective Date}}
+
+  Coverage Location:
+    {{Location Address}}
+    {{City}}, {{State}} {{Zip Code}}
+
+  Sprinklered Premises:  {{Sprinklered}}
+
+================================================================================
+SPRINKLER LEAKAGE COVERAGE
+================================================================================
+
+This policy is extended to cover direct physical loss or damage to covered
+property caused by or resulting from leakage or discharge from an automatic
+sprinkler system installed at {{Location Address}}.
+
+Coverage under this endorsement applies only where the insured premises have
+been confirmed as: Sprinklered — {{Sprinklered}}.
+
+================================================================================
+SPECIAL CONDITIONS
+================================================================================
+
+1. The insured, {{Named Insured}}, agrees to maintain all sprinkler systems
+   in proper working order throughout the policy period {{Effective Date}}
+   through {{Expiration Date}}.
+
+2. Any modification to the sprinkler system at {{Location Address}} must be
+   reported to the insurer within thirty (30) days of such modification.
+
+3. The deductible applicable to sprinkler leakage losses shall be ${{Deductible}},
+   which is the same as the per-occurrence deductible stated in the Declarations.
+
+================================================================================
+PREMIUM ADJUSTMENT
+================================================================================
+
+  Sprinkler Leakage Premium Adjustment: Included in Base Premium ${{Base Premium}}
+
+This endorsement is attached to and forms a part of Policy Number {{Policy Number}}
+issued to {{Named Insured}}, effective {{Effective Date}}.
+
+================================================================================
+ALL OTHER TERMS AND CONDITIONS OF THIS POLICY REMAIN UNCHANGED.
+================================================================================

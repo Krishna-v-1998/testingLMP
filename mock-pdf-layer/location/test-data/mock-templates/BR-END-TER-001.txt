@@ -1,0 +1,57 @@
+TERRORISM RISK INSURANCE ACT ENDORSEMENT
+Form Number: BR-END-TER-001
+Edition: 01/2024
+================================================================================
+
+This endorsement modifies insurance provided under:
+  BUILDERS RISK COVERAGE FORM (BR-001)
+
+================================================================================
+SCHEDULE
+================================================================================
+
+  Named Insured:              {{Named Insured}}
+  Policy Number:              {{Policy Number}}
+  Endorsement Effective Date: {{Effective Date}}
+
+================================================================================
+DISCLOSURE NOTICE — TERRORISM RISK INSURANCE ACT
+================================================================================
+
+You are hereby notified that under the Terrorism Risk Insurance Act, as amended,
+the definition of act of terrorism has changed. As defined in Section 102(1) of
+the Act, the term "act of terrorism" means any act that is certified by the
+Secretary of the Treasury, in consultation with the Secretary of Homeland Security
+and the Attorney General of the United States, to be an act of terrorism.
+
+================================================================================
+ELECTION OF TERRORISM COVERAGE
+================================================================================
+
+{{Named Insured}} has been offered and has elected the following:
+
+  Terrorism Coverage:         {{Terrorism Coverage}}
+  TRIA Surcharge Percentage:  {{TRIA Percentage}}%
+  Terrorism Premium:          ${{Terrorism Premium}}
+
+If the insured has elected to include terrorism coverage, the coverage provided
+under this endorsement applies to "certified acts of terrorism" as defined in the
+Terrorism Risk Insurance Act.
+
+================================================================================
+FEDERAL SHARE DISCLOSURE
+================================================================================
+
+You should know that where coverage is provided by this policy for losses caused
+by certified acts of terrorism, such losses may be partially reimbursed by the
+United States Government under a formula established by federal law. Under this
+formula, the United States Government generally reimburses a specified percentage
+of covered terrorism losses exceeding the statutorily established deductible paid
+by the insurance company providing the coverage.
+
+This endorsement is attached to and forms a part of Policy Number {{Policy Number}}
+issued to {{Named Insured}}, effective {{Effective Date}}.
+
+================================================================================
+ALL OTHER TERMS AND CONDITIONS OF THIS POLICY REMAIN UNCHANGED.
+================================================================================

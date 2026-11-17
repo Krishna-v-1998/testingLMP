@@ -1,0 +1,85 @@
+BUILDERS RISK COVERAGE FORM
+Form Number: BR-001
+Edition: 01/2024
+================================================================================
+
+DECLARATIONS
+
+Named Insured:    {{Named Insured}}
+Policy Number:    {{Policy Number}}
+Effective Date:   {{Effective Date}}
+Expiration Date:  {{Expiration Date}}
+
+Coverage Location:
+  {{Location Address}}
+  {{City}}, {{State}} {{Zip Code}}
+
+================================================================================
+COVERAGE SUMMARY
+================================================================================
+
+  Building Value (Hard Costs):    ${{Building Value}}
+  Contents / Soft Costs:          ${{Contents Value}}
+  Total Insured Value:            ${{Total Insured Value}}
+  Per-Occurrence Deductible:      ${{Deductible}}
+  Sprinklered Premises:           {{Sprinklered}}
+
+================================================================================
+COVERAGE AGREEMENT
+================================================================================
+
+In consideration of the premium paid by {{Named Insured}}, and subject to all
+terms and conditions of this policy, the insurer agrees to provide Builders Risk
+coverage as described herein.
+
+This policy covers direct physical loss or damage to covered property arising
+during the course of construction at the premises located at {{Location Address}},
+{{City}}, {{State}} {{Zip Code}}.
+
+Coverage under this policy is effective from {{Effective Date}} and shall remain
+in force through {{Expiration Date}}, unless cancelled or terminated earlier in
+accordance with the conditions set forth herein.
+
+The maximum limit of insurance payable under this policy shall not exceed
+${{Total Insured Value}} for any one occurrence.
+
+================================================================================
+DEDUCTIBLE PROVISION
+================================================================================
+
+The insured, {{Named Insured}}, shall bear the first ${{Deductible}} of each
+and every loss before this policy becomes applicable. This deductible applies
+per occurrence and is not subject to accumulation.
+
+================================================================================
+TERRORISM COVERAGE
+================================================================================
+
+Terrorism Coverage Elected:  {{Terrorism Coverage}}
+TRIA Surcharge Percentage:   {{TRIA Percentage}}%
+Terrorism Premium:           ${{Terrorism Premium}}
+
+Pursuant to the Terrorism Risk Insurance Act, {{Named Insured}} has been offered
+and has elected to {{Terrorism Coverage}} certified acts of terrorism coverage
+under this policy for the above-stated terrorism premium.
+
+================================================================================
+PREMIUM SUMMARY
+================================================================================
+
+  Base Premium:              ${{Base Premium}}
+  Terrorism Surcharge:       ${{Terrorism Premium}}
+  Annual Policy Premium:     ${{Annual Premium}}
+
+================================================================================
+PRODUCER INFORMATION
+================================================================================
+
+  Producer Name:   {{Producer Name}}
+  Commission Rate: {{Commission Rate}}%
+
+This policy is issued on behalf of {{Named Insured}} by the above-named producer.
+
+================================================================================
+ALL OTHER TERMS AND CONDITIONS OF THIS POLICY REMAIN UNCHANGED.
+================================================================================
