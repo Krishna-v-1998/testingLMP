@@ -1,62 +1,44 @@
-
-import { test, expect } from '@playwright/test';
-
-import { MockPdfValidator } from '../utils/MockPdfValidator';
-import { PdfComparisonReporter } from '../utils/PdfComparisonReporter';
-
-test('Validate generated PDF preview', async ({}, testInfo) => {
-
+test('BR-001: full comparison passes with all sample values', async ({}, testInfo) => {
   const input = {
-    templatePdfPath:
-      'test-data/mock-pdfs/template/BR-001.pdf',
-
-    previewPdfPath:
-      'test-data/mock-pdfs/preview/BR-001.pdf',
-
-    values: {
-      'Named Insured': 'Acme Construction LLC',
-      'Policy Number': 'BR-2025-001234',
-      'Policy Type': 'Inland Marine',
-    },
-
+    templatePdfPath: tpl('BR-001.pdf'),
+    previewPdfPath: prev('BR-001.pdf'),
+    values: BR_SAMPLE_VALUES,
     requiredStatements: [
       'direct physical loss or damage to covered property',
+      'Terrorism Risk Insurance Act',
+      'ALL OTHER TERMS AND CONDITIONS OF THIS POLICY REMAIN UNCHANGED',
     ],
   };
 
-  // 1. Validate template and preview PDFs
-  const validationResult =
-    await MockPdfValidator.comparePdfs(input);
+  // Step 1: Perform PDF validation
+  const result = await MockPdfValidator.comparePdfs(input);
 
-  // 2. Generate comparison report
+  MockPdfValidator.printReport(result);
+
+  // Step 2: Generate detailed HTML and JSON comparison reports
   const report = await PdfComparisonReporter.generate({
     templatePath: input.templatePdfPath,
     previewPath: input.previewPdfPath,
-
-    expectedText: validationResult.renderedText,
-    actualText: validationResult.previewText,
-
+    expectedText: result.renderedText,
+    actualText: result.previewText,
     expectedFields: input.values,
-
-    validationResult,
-
+    validationResult: result,
     testName: testInfo.title,
     outputPath: testInfo.outputPath('pdf-comparison'),
   });
 
-  // 3. Attach HTML report
+  // Step 3: Attach reports to Playwright execution
   await testInfo.attach('PDF Comparison Report', {
     path: report.htmlPath,
     contentType: 'text/html',
   });
 
-  // 4. Attach JSON comparison results
   await testInfo.attach('PDF Comparison Results', {
     path: report.jsonPath,
     contentType: 'application/json',
   });
 
-  // 5. Attach original PDFs
+  // Step 4: Attach source PDFs
   await testInfo.attach('Client Template PDF', {
     path: input.templatePdfPath,
     contentType: 'application/pdf',
@@ -67,12 +49,9 @@ test('Validate generated PDF preview', async ({}, testInfo) => {
     contentType: 'application/pdf',
   });
 
-  // 6. Print validation summary
-  MockPdfValidator.printReport(validationResult);
-
-  // 7. Assert both validation and detailed comparison
-  expect(
-    report.summary.overallPassed,
-    'PDF validation or detailed comparison failed. Check the PDF Comparison Report.'
-  ).toBe(true);
+  // Step 5: Assertions
+  expect(result.passed, result.summary).toBe(true);
+  expect(result.unresolvedVars).toHaveLength(0);
+  expect(result.failures).toHaveLength(0);
+  expect(report.summary.overallPassed).toBe(true);
 });
