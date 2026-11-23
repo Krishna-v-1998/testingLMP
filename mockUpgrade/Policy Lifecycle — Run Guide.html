@@ -1,0 +1,991 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!-- Policy Lifecycle Automation Framework — How to Run Guide -->
+<title>Policy Lifecycle — Run Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+/* ── Design tokens ─────────────────────────────────────────────────────────── */
+/* Layout: single-column narrative doc with sticky nav, code-heavy */
+:root {
+  --bg:          #0f1117;
+  --bg-surface:  #181c27;
+  --bg-elevated: #1f2435;
+  --border:      #2a3049;
+  --fg:          #e2e6f0;
+  --fg-muted:    #8b95b3;
+  --accent:      #4f9cf9;
+  --accent-dim:  #1e3860;
+  --green:       #3ecf8e;
+  --green-bg:    #0d2b1e;
+  --amber:       #f5a623;
+  --amber-bg:    #2b1d07;
+  --red:         #f47067;
+  --red-bg:      #2b100e;
+  --code-bg:     #111520;
+  --tag-mock:    #1a3356;
+  --tag-real:    #1a3328;
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg:          #f5f7fc;
+    --bg-surface:  #ffffff;
+    --bg-elevated: #eef1f9;
+    --border:      #d4d9eb;
+    --fg:          #1a1f30;
+    --fg-muted:    #5c6487;
+    --accent:      #1a6ef0;
+    --accent-dim:  #dce9ff;
+    --green:       #17956e;
+    --green-bg:    #e6f7f0;
+    --amber:       #c77600;
+    --amber-bg:    #fff5df;
+    --red:         #c0392b;
+    --red-bg:      #fde8e6;
+    --code-bg:     #1a1f30;
+    --tag-mock:    #dce9ff;
+    --tag-real:    #d4f5e7;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg:          #f5f7fc;
+  --bg-surface:  #ffffff;
+  --bg-elevated: #eef1f9;
+  --border:      #d4d9eb;
+  --fg:          #1a1f30;
+  --fg-muted:    #5c6487;
+  --accent:      #1a6ef0;
+  --accent-dim:  #dce9ff;
+  --green:       #17956e;
+  --green-bg:    #e6f7f0;
+  --amber:       #c77600;
+  --amber-bg:    #fff5df;
+  --red:         #c0392b;
+  --red-bg:      #fde8e6;
+  --code-bg:     #1a1f30;
+  --tag-mock:    #dce9ff;
+  --tag-real:    #d4f5e7;
+  color-scheme: light;
+}
+
+/* ── Reset / base ───────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+  padding-left:  max(0px, env(safe-area-inset-left,  0px));
+  padding-right: max(0px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Layout shell ───────────────────────────────────────────────────────────── */
+.shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+@media (max-width: 720px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidenav { display: none; }
+}
+
+/* ── Sticky side-nav ────────────────────────────────────────────────────────── */
+.sidenav {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 2rem 0 2rem 1rem;
+  border-right: 1px solid var(--border);
+  font-size: 13px;
+}
+.sidenav-logo {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  padding-left: .5rem;
+  margin-bottom: 1.2rem;
+}
+.sidenav-section {
+  margin-top: 1rem;
+  padding-left: .5rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.sidenav a {
+  display: block;
+  padding: .3rem .5rem;
+  border-radius: 5px;
+  color: var(--fg-muted);
+  transition: color .15s, background .15s;
+  line-height: 1.4;
+}
+.sidenav a:hover, .sidenav a.active {
+  color: var(--fg);
+  background: var(--bg-elevated);
+  text-decoration: none;
+}
+.sidenav a.active { color: var(--accent); }
+
+/* ── Main content ───────────────────────────────────────────────────────────── */
+.content {
+  padding: 2.5rem max(1.5rem, env(safe-area-inset-right, 0px)) 4rem max(1.5rem, env(safe-area-inset-left, 0px));
+  min-width: 0;
+}
+
+/* ── Hero header ────────────────────────────────────────────────────────────── */
+.hero {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 2rem;
+  margin-bottom: 2.5rem;
+}
+.hero-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: .4rem;
+}
+.hero h1 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 .6rem;
+  text-wrap: balance;
+}
+.hero-sub {
+  color: var(--fg-muted);
+  font-size: .9rem;
+  margin: 0;
+}
+.flow-pill {
+  display: inline-flex;
+  gap: .3rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.flow-step {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: .2rem .5rem;
+  border-radius: 4px;
+  color: var(--fg-muted);
+}
+.flow-arrow { color: var(--border); font-size: 10px; }
+
+/* ── Section headings ───────────────────────────────────────────────────────── */
+.section {
+  margin-bottom: 3rem;
+  scroll-margin-top: 1.5rem;
+}
+.section-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: .15rem .5rem;
+  border-radius: 3px;
+  margin-bottom: .6rem;
+}
+.badge-setup    { background: var(--accent-dim); color: var(--accent); }
+.badge-mock     { background: var(--tag-mock);   color: #89b8ff; }
+.badge-real     { background: var(--tag-real);   color: var(--green); }
+.badge-forms    { background: var(--amber-bg);   color: var(--amber); }
+.badge-info     { background: var(--bg-elevated); color: var(--fg-muted); }
+
+h2 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+  text-wrap: balance;
+}
+h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.5rem 0 .5rem;
+  color: var(--fg);
+}
+p { margin: 0 0 .8rem; }
+
+/* ── Steps ──────────────────────────────────────────────────────────────────── */
+.steps { display: flex; flex-direction: column; gap: .5rem; margin: 1rem 0; }
+.step {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  gap: .75rem;
+  align-items: start;
+}
+.step-num {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: .15rem;
+}
+.step-body { min-width: 0; }
+.step-body strong { display: block; font-weight: 600; margin-bottom: .2rem; }
+.step-body p { margin: 0; color: var(--fg-muted); font-size: .9rem; }
+.step-body .code-block { margin-top: .5rem; }
+
+/* ── Code blocks ────────────────────────────────────────────────────────────── */
+.code-block {
+  position: relative;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow-x: auto;
+  margin: .6rem 0;
+}
+.code-block pre {
+  margin: 0;
+  padding: .9rem 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #c8d3f5;
+  white-space: pre;
+}
+.code-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--fg-muted);
+  padding: .35rem 1rem .2rem;
+  border-bottom: 1px solid var(--border);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.copy-btn {
+  position: absolute;
+  top: .4rem;
+  right: .4rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+  padding: .2rem .5rem;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color .15s, background .15s;
+  font-family: 'Inter', sans-serif;
+}
+.copy-btn:hover { background: var(--bg); color: var(--fg); }
+.copy-btn.copied { color: var(--green); }
+/* no code-label: bump copy btn lower */
+.code-block.no-label .copy-btn { top: .4rem; }
+
+/* ── Inline code ────────────────────────────────────────────────────────────── */
+code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .85em;
+  background: var(--bg-elevated);
+  padding: .1em .35em;
+  border-radius: 3px;
+  color: #9ec9ff;
+}
+
+/* ── Callout boxes ──────────────────────────────────────────────────────────── */
+.callout {
+  border-radius: 7px;
+  padding: .8rem 1rem;
+  margin: .8rem 0;
+  font-size: .9rem;
+  display: grid;
+  grid-template-columns: 1.2rem 1fr;
+  gap: .6rem;
+  align-items: start;
+}
+.callout-icon { font-size: 1rem; line-height: 1.4; }
+.callout p { margin: 0; }
+.callout.tip     { background: var(--accent-dim); border-left: 3px solid var(--accent); }
+.callout.success { background: var(--green-bg);   border-left: 3px solid var(--green); }
+.callout.warn    { background: var(--amber-bg);   border-left: 3px solid var(--amber); }
+.callout.info    { background: var(--bg-elevated); border-left: 3px solid var(--border); }
+
+/* ── Comparison cards (mock vs real) ────────────────────────────────────────── */
+.mode-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+@media (max-width: 600px) { .mode-cards { grid-template-columns: 1fr; } }
+.mode-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--bg-surface);
+}
+.mode-card-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: .5rem;
+}
+.mock-label { color: #89b8ff; }
+.real-label { color: var(--green); }
+.mode-card ul {
+  margin: .5rem 0 0;
+  padding: 0 0 0 1.1rem;
+  font-size: .88rem;
+  color: var(--fg-muted);
+}
+.mode-card ul li { margin-bottom: .2rem; }
+
+/* ── Tables ─────────────────────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; margin: .6rem 0; }
+table { border-collapse: collapse; width: 100%; font-size: .88rem; min-width: 420px; }
+th {
+  text-align: left;
+  padding: .5rem .75rem;
+  background: var(--bg-elevated);
+  color: var(--fg-muted);
+  font-weight: 600;
+  font-size: .78rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: .5rem .75rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  color: var(--fg);
+}
+td code { font-size: .82em; }
+tr:last-child td { border-bottom: none; }
+
+/* ── Checklist ──────────────────────────────────────────────────────────────── */
+.checklist { list-style: none; padding: 0; margin: .5rem 0; }
+.checklist li {
+  display: flex;
+  gap: .6rem;
+  align-items: flex-start;
+  padding: .25rem 0;
+  font-size: .9rem;
+}
+.check-icon { flex-shrink: 0; color: var(--green); font-weight: 700; margin-top: .05rem; }
+.check-icon.warn { color: var(--amber); }
+
+/* ── Excel schema legend ────────────────────────────────────────────────────── */
+.col-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: .4rem;
+  margin: .6rem 0;
+}
+.col-item {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: .35rem .6rem;
+  font-size: .82rem;
+}
+.col-item code { background: none; padding: 0; color: var(--accent); font-size: .85em; }
+.col-item small { display: block; color: var(--fg-muted); font-size: .78rem; margin-top: .1rem; }
+.col-item.highlight { border-color: var(--amber); background: var(--amber-bg); }
+.col-item.highlight code { color: var(--amber); }
+
+/* ── Divider ────────────────────────────────────────────────────────────────── */
+hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+</style>
+
+<div class="shell">
+
+  <!-- ── Sticky side-nav ──────────────────────────────────────────────────── -->
+  <nav class="sidenav" aria-label="Page navigation">
+    <div class="sidenav-logo">Policy Lifecycle</div>
+
+    <div class="sidenav-section">Setup</div>
+    <a href="#prerequisites">Prerequisites</a>
+    <a href="#excel-manifest">Excel Manifest</a>
+
+    <div class="sidenav-section">Running</div>
+    <a href="#mock-run">Mock Run</a>
+    <a href="#real-run">Real Mode</a>
+    <a href="#forms-validation">Forms Validation</a>
+    <a href="#individual-tests">Individual Tests</a>
+
+    <div class="sidenav-section">Reference</div>
+    <a href="#env-vars">Env Variables</a>
+    <a href="#test-map">Test Map</a>
+    <a href="#excel-schema">Excel Schema</a>
+    <a href="#adding-forms">Adding Forms</a>
+    <a href="#switching-mode">Switching Mode</a>
+    <a href="#troubleshooting">Troubleshooting</a>
+  </nav>
+
+  <!-- ── Main content ─────────────────────────────────────────────────────── -->
+  <main class="content">
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-eyebrow">Allianz Insurance · Unqork Platform · Playwright + TypeScript</div>
+      <h1>Policy Lifecycle Automation Framework</h1>
+      <p class="hero-sub">How to set up, run mock tests today, and switch to live validation once the app is ready.</p>
+      <div class="flow-pill">
+        <span class="flow-step">Quote</span>
+        <span class="flow-arrow">▶</span>
+        <span class="flow-step">Binder</span>
+        <span class="flow-arrow">▶</span>
+        <span class="flow-step">Premium Booking</span>
+        <span class="flow-arrow">▶</span>
+        <span class="flow-step">Policy</span>
+      </div>
+    </div>
+
+    <!-- ── PREREQUISITES ─────────────────────────────────────────────────── -->
+    <section class="section" id="prerequisites">
+      <span class="section-badge badge-setup">Step 1 — Setup</span>
+      <h2>Prerequisites</h2>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Install dependencies</strong>
+            <p>Run once after cloning the repo.</p>
+            <div class="code-block no-label">
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              <pre>npm install
+npx playwright install chromium</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Create storage-state login files</strong>
+            <p>Three saved browser sessions — one per role. Run the codegen command below and log in as the matching user, then close the browser.</p>
+            <div class="code-block">
+              <div class="code-label">Generate GBO session (repeat for cuo.json and uw.json)</div>
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              <pre>npx playwright codegen \
+  --save-storage=storage-states/gbo.json \
+  https://your-app-url.com</pre>
+            </div>
+            <div class="callout warn">
+              <span class="callout-icon">⚠</span>
+              <p>Add <code>storage-states/</code> to <code>.gitignore</code> — these files contain session tokens.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Set the base URL</strong>
+            <p>Create <code>.env.qa</code> (and optionally <code>.env.staging</code>) in the project root.</p>
+            <div class="code-block">
+              <div class="code-label">.env.qa</div>
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              <pre>BASE_URL=https://your-allianz-app-url.com</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Bootstrap the Excel form manifest</strong>
+            <p>Run once to create <code>test-data/form-manifest.xlsx</code> with the correct 15-column schema and sample rows.</p>
+            <div class="code-block no-label">
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              <pre>npx tsx scripts/generate-mock-manifest.ts</pre>
+            </div>
+            <p style="font-size:.88rem;color:var(--fg-muted);margin:.4rem 0 0">Open the file, delete the sample rows, and add your real forms. See <a href="#excel-schema">Excel Schema</a> below for the column guide.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-body">
+            <strong>Generate mock PDFs from the manifest</strong>
+            <p>Reads every form in the manifest and auto-generates template + preview PDFs. No manual PDF authoring needed.</p>
+            <div class="code-block no-label">
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              <pre>npx tsx scripts/generate-mock-pdfs.ts</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ── EXCEL MANIFEST ────────────────────────────────────────────────── -->
+    <section class="section" id="excel-manifest">
+      <span class="section-badge badge-forms">Excel Manifest</span>
+      <h2>form-manifest.xlsx — What Goes Where</h2>
+      <p>The manifest is the <strong>only place you ever touch</strong> when adding new forms. Sheet name must be <code>Forms</code>. One row per field. Repeat form-level columns on every field row for the same form.</p>
+
+      <div class="col-grid">
+        <div class="col-item"><code>Product</code><small>e.g. Builder's Risk</small></div>
+        <div class="col-item"><code>Sub Segment</code><small>e.g. Standard</small></div>
+        <div class="col-item"><code>Formset</code><small>Radio-button group name in UI</small></div>
+        <div class="col-item"><code>Transaction</code><small>Pipe-separated: Quote|Binder|Policy</small></div>
+        <div class="col-item"><code>Lotus Notes Form Number</code><small>Client form reference</small></div>
+        <div class="col-item"><code>Unqork Form Number</code><small>Unqork ID — also the PDF filename</small></div>
+        <div class="col-item"><code>Form Name</code><small>Display name shown in UI</small></div>
+        <div class="col-item"><code>Lotus Notes Form ID</code><small>ID label next to form name</small></div>
+        <div class="col-item"><code>Form Order</code><small>Sort order within formset</small></div>
+        <div class="col-item"><code>Category</code><small>Mandatory or Optional</small></div>
+        <div class="col-item"><code>States Applicable</code><small>Pipe-separated codes, or ALL</small></div>
+        <div class="col-item"><code>Fields</code><small>Field label shown in UI <em>or</em> full statement text</small></div>
+        <div class="col-item"><code>Field ID</code><small>CSS selector e.g. #namedInsured</small></div>
+        <div class="col-item highlight"><code>Type</code><small><strong>statement</strong> = required text in PDF; otherwise field type</small></div>
+        <div class="col-item"><code>Mapping</code><small>Source path if auto-populated</small></div>
+      </div>
+
+      <div class="callout success">
+        <span class="callout-icon">★</span>
+        <p><strong>Required statements:</strong> set <code>Type = statement</code> on a row and put the full static phrase in the <code>Fields</code> column (leave Field ID and Mapping empty). The PDF generator embeds this text verbatim, and the validator checks it appears in the preview PDF word-for-word.</p>
+      </div>
+
+      <h3>Example — one form with fields and statements</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Unqork Form Number</th><th>Form Name</th><th>Fields</th><th>Field ID</th><th>Type</th><th>Mapping</th></tr></thead>
+          <tbody>
+            <tr><td><code>UQ-BR-001</code></td><td>Builder's Risk Coverage</td><td>Named Insured</td><td><code>#namedInsured</code></td><td>Textfield</td><td></td></tr>
+            <tr><td><code>UQ-BR-001</code></td><td>Builder's Risk Coverage</td><td>Policy Number</td><td><code>#policyNumber</code></td><td>Textfield</td><td><code>submission.policyNumber</code></td></tr>
+            <tr><td><code>UQ-BR-001</code></td><td>Builder's Risk Coverage</td><td>Effective Date</td><td><code>#effectiveDate</code></td><td>Date</td><td></td></tr>
+            <tr style="background:var(--amber-bg)"><td><code>UQ-BR-001</code></td><td>Builder's Risk Coverage</td><td><em>In consideration of the premium charged, it is hereby agreed that this policy covers…</em></td><td><em>leave empty</em></td><td><strong>statement</strong></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ── MOCK RUN ──────────────────────────────────────────────────────── -->
+    <section class="section" id="mock-run">
+      <span class="section-badge badge-mock">Mock Run</span>
+      <h2>How to Do a Mock Run</h2>
+      <p>Mock mode runs <strong>entirely offline</strong> — no browser session, no live app, no PDF viewer needed. It compares local PDF files only. Use this to validate the manifest, PDFs, and test logic today.</p>
+
+      <div class="mode-cards">
+        <div class="mode-card">
+          <div class="mode-card-label mock-label">✦ Mock Mode</div>
+          <ul>
+            <li>No browser required for PDF checks</li>
+            <li>Reads local template + preview PDFs</li>
+            <li>Checks field values and required statements</li>
+            <li>Works before the app PDF viewer exists</li>
+            <li>Triggered by <code>USE_MOCK_PDF=true</code></li>
+          </ul>
+        </div>
+        <div class="mode-card">
+          <div class="mode-card-label real-label">✦ Real Mode</div>
+          <ul>
+            <li>Full browser + live app required</li>
+            <li>Captures PDF bytes from in-app viewer</li>
+            <li>Validates against live UI field values</li>
+            <li>Checks required statements from manifest</li>
+            <li>No flag needed — real mode is the default</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>1 — Run offline PDF unit tests (no app needed)</h3>
+      <div class="code-block no-label">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>npx playwright test tests/mock/mock-pdf-comparison.spec.ts</pre>
+      </div>
+      <p style="font-size:.88rem;color:var(--fg-muted)">Validates that all <code>{{variables}}</code> in templates resolve, field values appear in preview PDFs, and required statements are present. No app connection needed. 14 tests.</p>
+
+      <h3>2 — Run the full policy lifecycle in mock PDF mode</h3>
+      <div class="code-block">
+        <div class="code-label">Mac / Linux</div>
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>USE_MOCK_PDF=true BASE_URL=https://your-app-url.com \
+  npx playwright test tests/lifecycle/policy-lifecycle.spec.ts --workers=1</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-label">Windows — Command Prompt</div>
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>set USE_MOCK_PDF=true
+set BASE_URL=https://your-app-url.com
+npx playwright test tests/lifecycle/policy-lifecycle.spec.ts --workers=1</pre>
+      </div>
+
+      <div class="callout tip">
+        <span class="callout-icon">ℹ</span>
+        <p>Always use <code>--workers=1</code> for the lifecycle spec. The 17 tests are serial and share submission state across the run.</p>
+      </div>
+
+      <h3>3 — Run forms validation in mock PDF mode</h3>
+      <div class="code-block">
+        <div class="code-label">All products from manifest (no browser)</div>
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>USE_MOCK_PDF=true \
+  npx playwright test tests/forms/forms-validation.spec.ts</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-label">Filter to one product / transaction</div>
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>PRODUCT="Builder's Risk" TRANSACTION=Quote USE_MOCK_PDF=true \
+  npx playwright test tests/forms/forms-validation.spec.ts</pre>
+      </div>
+
+      <div class="callout info">
+        <span class="callout-icon">⚑</span>
+        <p>The forms validation test is <strong>data-driven</strong> — it reads every product and formset from the manifest automatically. Adding new forms to the Excel = new tests run. No code changes ever needed here.</p>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ── REAL MODE ─────────────────────────────────────────────────────── -->
+    <section class="section" id="real-run">
+      <span class="section-badge badge-real">Real Mode</span>
+      <h2>How to Run Once Original Functionality Is Available</h2>
+      <p>When the in-app PDF viewer is live, switching from mock to real is a one-line change — no code modifications, only env vars.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Remove <code>USE_MOCK_PDF=true</code> from your env file</strong>
+            <p>Open <code>.env.qa</code> and delete (or set to <code>false</code>) the flag. That's the only change needed.</p>
+            <div class="code-block">
+              <div class="code-label">.env.qa — before</div>
+              <pre>BASE_URL=https://your-app-url.com
+USE_MOCK_PDF=true   ← remove this line</pre>
+            </div>
+            <div class="code-block">
+              <div class="code-label">.env.qa — after</div>
+              <pre>BASE_URL=https://your-app-url.com</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Run the full lifecycle</strong>
+            <p><code>FormsPage</code> automatically switches to <code>PdfValidator.captureAndValidate()</code>, which opens the new-tab PDF viewer and validates live values.</p>
+            <div class="code-block no-label">
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              <pre>BASE_URL=https://your-app-url.com \
+  npx playwright test tests/lifecycle/policy-lifecycle.spec.ts --workers=1</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Run forms validation against a live submission</strong>
+            <p>Provide the URL of an existing open submission. The test navigates to its Forms tab and validates all formsets.</p>
+            <div class="code-block no-label">
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              <pre>BASE_URL=https://your-app-url.com \
+SUBMISSION_URL=https://your-app-url.com/submissions/12345 \
+  npx playwright test tests/forms/forms-validation.spec.ts --workers=1</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout success">
+        <span class="callout-icon">✓</span>
+        <p>The mock PDFs remain in <code>test-data/mock-pdfs/</code> after switching to real mode. The offline unit tests (<code>tests/mock/mock-pdf-comparison.spec.ts</code>) continue to use them — nothing needs to be deleted.</p>
+      </div>
+
+      <h3>What the validator checks in real mode</h3>
+      <ul style="font-size:.9rem;color:var(--fg-muted);line-height:1.8;">
+        <li>Form number (<code>Unqork Form Number</code>) appears in the PDF</li>
+        <li>Form name appears in the PDF</li>
+        <li>Each field label + its live UI value appear together in the PDF</li>
+        <li><strong>Required statements</strong> (all <code>Type=statement</code> rows from the manifest) appear verbatim in the PDF</li>
+      </ul>
+    </section>
+
+    <hr>
+
+    <!-- ── FORMS VALIDATION ──────────────────────────────────────────────── -->
+    <section class="section" id="forms-validation">
+      <span class="section-badge badge-forms">Forms Validation</span>
+      <h2>Forms Validation — Data-Driven</h2>
+      <p>The forms test is fully driven by the Excel manifest. Filters are applied with env vars; without them, all products and formsets in the manifest are tested.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>PRODUCT</code></td><td><em>all</em></td><td>Filter to one product name</td></tr>
+            <tr><td><code>SUB_SEGMENT</code></td><td><em>all</em></td><td>Filter to one sub-segment</td></tr>
+            <tr><td><code>TRANSACTION</code></td><td><code>Quote</code></td><td>Quote | Binder | Policy</td></tr>
+            <tr><td><code>STATE</code></td><td><em>no filter</em></td><td>Filter to one state code, e.g. <code>CA</code></td></tr>
+            <tr><td><code>SUBMISSION_URL</code></td><td>—</td><td>URL of open submission (real mode only)</td></tr>
+            <tr><td><code>FORM_MANIFEST_PATH</code></td><td><code>test-data/form-manifest.xlsx</code></td><td>Override manifest location</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ── INDIVIDUAL TESTS ───────────────────────────────────────────────── -->
+    <section class="section" id="individual-tests">
+      <span class="section-badge badge-info">Individual Tests</span>
+      <h2>Running Individual Tests</h2>
+      <div class="code-block">
+        <div class="code-label">By test number</div>
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>npx playwright test tests/lifecycle/policy-lifecycle.spec.ts -g "03 —" --workers=1</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-label">By keyword with headed browser</div>
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>npx playwright test tests/lifecycle/policy-lifecycle.spec.ts \
+  -g "Binder" --headed --slow-mo 500 --workers=1</pre>
+      </div>
+      <div class="code-block">
+        <div class="code-label">Skip submission creation — point at existing submission</div>
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre>SUBMISSION_URL=https://your-app/submissions/12345 \
+SUBMISSION_ID=12345 \
+USE_MOCK_PDF=true \
+  npx playwright test tests/lifecycle/policy-lifecycle.spec.ts -g "09 —" --workers=1</pre>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ── ENV VARS ───────────────────────────────────────────────────────── -->
+    <section class="section" id="env-vars">
+      <span class="section-badge badge-info">Reference</span>
+      <h2>Environment Variables</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>BASE_URL</code></td><td>✅ Real mode</td><td>—</td><td>App base URL</td></tr>
+            <tr><td><code>SUBMISSION_URL</code></td><td>Optional</td><td>—</td><td>Skip submission creation; point at existing</td></tr>
+            <tr><td><code>SUBMISSION_ID</code></td><td>Optional</td><td>—</td><td>Matching ID for SUBMISSION_URL</td></tr>
+            <tr><td><code>USE_MOCK_PDF</code></td><td>Optional</td><td><code>false</code></td><td><code>true</code> = compare local PDFs, no browser needed for PDF</td></tr>
+            <tr><td><code>PDF_VIEWER_AVAILABLE</code></td><td>Optional</td><td>—</td><td><code>false</code> = same as USE_MOCK_PDF=true</td></tr>
+            <tr><td><code>MOCK_PDF_DIR</code></td><td>Optional</td><td><code>test-data/mock-pdfs</code></td><td>Base dir containing template/ and preview/ subdirs</td></tr>
+            <tr><td><code>MOCK_PDF_TEMPLATE_DIR</code></td><td>Optional</td><td>auto</td><td>Override template PDF directory independently</td></tr>
+            <tr><td><code>MOCK_PDF_PREVIEW_DIR</code></td><td>Optional</td><td>auto</td><td>Override preview PDF directory independently</td></tr>
+            <tr><td><code>PDF_VALIDATION_ENABLED</code></td><td>Optional</td><td><code>true</code></td><td><code>false</code> = skip all PDF/forms validation</td></tr>
+            <tr><td><code>ENV</code></td><td>Optional</td><td><code>qa</code></td><td><code>staging</code> = load .env.staging instead of .env.qa</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ── TEST MAP ───────────────────────────────────────────────────────── -->
+    <section class="section" id="test-map">
+      <span class="section-badge badge-info">Reference</span>
+      <h2>Lifecycle Test Map</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Test</th><th>Role</th><th>Depends On</th></tr></thead>
+          <tbody>
+            <tr><td>01</td><td>Add a location</td><td>GBO</td><td>—</td></tr>
+            <tr><td>02</td><td>Create a new BR quote</td><td>GBO</td><td>01</td></tr>
+            <tr><td>03</td><td>Fill BR product fields (Quote)</td><td>GBO</td><td>02</td></tr>
+            <tr><td>04</td><td>Validate Quote forms vs manifest</td><td>GBO</td><td>03</td></tr>
+            <tr><td>05</td><td>Generate Quote (→ Generated)</td><td>GBO</td><td>04</td></tr>
+            <tr><td>06</td><td>Finalize Quote (→ Finalized)</td><td>GBO</td><td>05</td></tr>
+            <tr style="background:var(--accent-dim)"><td>07</td><td>Status: Open → Quoted</td><td><strong>CUO</strong></td><td>06</td></tr>
+            <tr style="background:var(--accent-dim)"><td>08</td><td>Status: Quoted → Bound</td><td><strong>CUO</strong></td><td>07</td></tr>
+            <tr><td>09</td><td>Generate Binder</td><td>GBO</td><td>08</td></tr>
+            <tr><td>10</td><td>Verify BR fields in Binder (read-only)</td><td>GBO</td><td>09</td></tr>
+            <tr><td>11</td><td>Validate Binder forms vs manifest</td><td>GBO</td><td>09</td></tr>
+            <tr><td>12</td><td>Generate &amp; Finalize Binder</td><td>GBO</td><td>11</td></tr>
+            <tr><td>13</td><td>Status: Bound → In-Processing</td><td>GBO</td><td>12</td></tr>
+            <tr><td>14</td><td>Premium Booking: Send to WINS</td><td>GBO</td><td>13</td></tr>
+            <tr><td>15</td><td>Generate Policy</td><td>GBO</td><td>14</td></tr>
+            <tr><td>16</td><td>Validate Policy forms vs manifest</td><td>GBO</td><td>15</td></tr>
+            <tr><td>17</td><td>Finalize Policy (→ Finalized)</td><td>GBO</td><td>16</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ── EXCEL SCHEMA ───────────────────────────────────────────────────── -->
+    <section class="section" id="excel-schema">
+      <span class="section-badge badge-forms">Reference</span>
+      <h2>Excel Schema — All 15 Columns</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Column</th><th>Example</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>Product</code></td><td>Builder's Risk</td><td>Product line name</td></tr>
+            <tr><td><code>Sub Segment</code></td><td>Standard</td><td></td></tr>
+            <tr><td><code>Formset</code></td><td>FS-Alpha</td><td>Radio-button group name in the UI</td></tr>
+            <tr><td><code>Transaction</code></td><td>Quote|Binder</td><td>Pipe-separated</td></tr>
+            <tr><td><code>Lotus Notes Form Number</code></td><td>LN-BR-001</td><td>Client form reference</td></tr>
+            <tr><td><code>Unqork Form Number</code></td><td>UQ-BR-001</td><td>Unqork ID — also the PDF filename</td></tr>
+            <tr><td><code>Form Name</code></td><td>Builder's Risk Coverage</td><td>Display name in UI</td></tr>
+            <tr><td><code>Lotus Notes Form ID</code></td><td>LN-BR-001</td><td>ID label next to form name</td></tr>
+            <tr><td><code>Form Order</code></td><td>1</td><td>Sort order within formset</td></tr>
+            <tr><td><code>Category</code></td><td>Mandatory</td><td>Mandatory or Optional</td></tr>
+            <tr><td><code>States Applicable</code></td><td>CA|NY|TX</td><td>Pipe-separated codes, or ALL</td></tr>
+            <tr><td><code>Fields</code></td><td>Named Insured <em>or</em> full statement text</td><td>Field label <strong>or</strong> required statement text when Type=statement</td></tr>
+            <tr><td><code>Field ID</code></td><td>#namedInsured</td><td>CSS selector — empty for statement rows</td></tr>
+            <tr style="background:var(--amber-bg)"><td><code>Type</code></td><td><strong>statement</strong> | Textfield | Date | Dropdown…</td><td><strong>statement</strong> = static text that must appear verbatim in PDF</td></tr>
+            <tr><td><code>Mapping</code></td><td>submission.policyNumber</td><td>Source path if auto-populated; test reads not fills</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ── ADDING FORMS ───────────────────────────────────────────────────── -->
+    <section class="section" id="adding-forms">
+      <span class="section-badge badge-forms">Zero Code Changes</span>
+      <h2>Adding New Forms or Formsets</h2>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Add rows to <code>form-manifest.xlsx</code></strong>
+            <p>One row per field. Repeat form-level columns (Product → States Applicable) on every field row. Add statement rows with <code>Type=statement</code> for required PDF phrases.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Regenerate mock PDFs</strong>
+            <div class="code-block no-label">
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              <pre>npx tsx scripts/generate-mock-pdfs.ts</pre>
+            </div>
+            <p>Reads the manifest and auto-generates template + preview PDFs for every form. No manual PDF authoring needed.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Run — new forms appear automatically</strong>
+            <div class="code-block no-label">
+              <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+              <pre>USE_MOCK_PDF=true npx playwright test tests/forms/forms-validation.spec.ts</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout success">
+        <span class="callout-icon">✓</span>
+        <p>No TypeScript file needs to be touched. The test discovers all forms, formsets, fields, and required statements from the Excel manifest at runtime.</p>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ── SWITCHING MODE ─────────────────────────────────────────────────── -->
+    <section class="section" id="switching-mode">
+      <span class="section-badge badge-info">Reference</span>
+      <h2>Switching Environments &amp; Modes</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Command</th><th>Runs on</th></tr></thead>
+          <tbody>
+            <tr><td><code>npx playwright test …</code></td><td>QA (default — loads .env.qa)</td></tr>
+            <tr><td><code>ENV=staging npx playwright test …</code></td><td>Staging (loads .env.staging)</td></tr>
+            <tr><td><code>USE_MOCK_PDF=true …</code></td><td>Mock PDF mode — offline, no PDF viewer</td></tr>
+            <tr><td>(no USE_MOCK_PDF flag)</td><td>Real PDF mode — requires live app + PDF viewer</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ── TROUBLESHOOTING ────────────────────────────────────────────────── -->
+    <section class="section" id="troubleshooting">
+      <span class="section-badge badge-info">Troubleshooting</span>
+      <h2>Troubleshooting</h2>
+
+      <ul class="checklist">
+        <li><span class="check-icon warn">!</span><div><strong>storage-state file not found</strong><br><span style="color:var(--fg-muted);font-size:.88rem">Run your login script to generate <code>storage-states/gbo.json</code> and <code>storage-states/cuo.json</code>.</span></div></li>
+        <li><span class="check-icon warn">!</span><div><strong>No BASE_URL provided</strong><br><span style="color:var(--fg-muted);font-size:.88rem">Set <code>BASE_URL</code> in <code>.env.qa</code> or export it in your shell.</span></div></li>
+        <li><span class="check-icon warn">!</span><div><strong>Mock PDF(s) not found for UQ-XXX</strong><br><span style="color:var(--fg-muted);font-size:.88rem">You added rows to the manifest but haven't regenerated PDFs. Run <code>npx tsx scripts/generate-mock-pdfs.ts</code>.</span></div></li>
+        <li><span class="check-icon warn">!</span><div><strong>Forms validation skipped with warning</strong><br><span style="color:var(--fg-muted);font-size:.88rem">Either <code>PDF_VALIDATION_ENABLED=false</code> is set, or the manifest has no matching rows. Verify the sheet name is exactly <code>Forms</code>.</span></div></li>
+        <li><span class="check-icon warn">!</span><div><strong>No matching scenarios in manifest for current env filters</strong><br><span style="color:var(--fg-muted);font-size:.88rem">The <code>PRODUCT</code> / <code>SUB_SEGMENT</code> / <code>TRANSACTION</code> env vars don't match any rows. Run without filters first to see what's available.</span></div></li>
+        <li><span class="check-icon warn">!</span><div><strong>Submission context is stale / deleted submission</strong><br><span style="color:var(--fg-muted);font-size:.88rem">Delete <code>test-data/contexts/policy-lifecycle.json</code> and re-run from test 01.</span></div></li>
+        <li><span class="check-icon warn">!</span><div><strong>Required statement check fails but text seems present</strong><br><span style="color:var(--fg-muted);font-size:.88rem">The statement text must match character-for-character what's in the Excel. PDF line-wrap is handled automatically, but extra spaces or punctuation differences will fail. Copy the exact text from the PDF into the manifest.</span></div></li>
+      </ul>
+    </section>
+
+  </main>
+</div>
+
+<script>
+// Active nav tracking
+const sections = document.querySelectorAll('.section[id]');
+const navLinks  = document.querySelectorAll('.sidenav a[href^="#"]');
+
+const observer = new IntersectionObserver(entries => {
+  for (const e of entries) {
+    if (e.isIntersecting) {
+      navLinks.forEach(a => {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id);
+      });
+    }
+  }
+}, { rootMargin: '-20% 0px -70% 0px' });
+
+sections.forEach(s => observer.observe(s));
+
+// Copy buttons
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  const text = pre ? pre.textContent : '';
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+  }).catch(() => {
+    const range = document.createRange();
+    range.selectNodeContents(pre);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
+}
+</script>
+
+</body></html>
