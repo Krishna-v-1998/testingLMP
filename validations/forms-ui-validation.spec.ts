@@ -2,95 +2,113 @@
  * forms-ui-validation.spec.ts
  *
  * DATA-DRIVEN Forms UI validation.
- * All test data comes from forms-fixture.xlsx via ExcelFixtureReader — zero hardcoded values.
+ * All test data — transactions, formsets, states, field values — comes from
+ * forms-fixture.xlsx via ExcelFixtureReader.  Zero hardcoded values.
  *
- * ── HOW THE SUBMISSION CONTEXT IS PROVIDED ────────────────────────────────────
+ * ── HOW THE DATA IS STRUCTURED IN EXCEL ──────────────────────────────────────
  *
- *   This spec does NOT accept SUBMISSION_URL as a bare environment variable.
- *   Instead it follows the same pattern as policy-lifecycle.spec.ts:
+ *   Each row in the Excel represents one field of one form.
+ *   Multiple rows with the same form number are merged into one FixtureFormEntry.
  *
- *   test.beforeAll → SubmissionSetupService.createAndStoreContext()
+ *   The columns that DRIVE TEST GROUPING are:
  *
- *   That call either:
- *     a) Reuses a cached context from test-data/contexts/<label>.json  (default)
- *     b) Reads SUBMISSION_URL + SUBMISSION_ID env vars (CI / quick-run override)
- *     c) Creates a brand-new submission via AuthManager + browser storage state
+ *   ┌──────────────────────┬─────────────────────────────────────────────────┐
+ *   │ Excel column         │ What it means for the tests                     │
+ *   ├──────────────────────┼─────────────────────────────────────────────────┤
+ *   │ Transaction          │ "Quote|Binder" → form appears in Quote AND      │
+ *   │ (pipe-separated)     │ Binder transactions.  Stored as transactions[]  │
+ *   ├──────────────────────┼─────────────────────────────────────────────────┤
+ *   │ Formset              │ Radio-button group on the Forms tab.            │
+ *   │                      │ e.g. "Builder's Risk"                           │
+ *   ├──────────────────────┼─────────────────────────────────────────────────┤
+ *   │ States Applicable    │ "CA|TX" or "ALL" → which states this form is   │
+ *   │ (pipe-separated)     │ shown for.  Used to filter to the submission's  │
+ *   │                      │ insured state from SubmissionContext.           │
+ *   ├──────────────────────┼─────────────────────────────────────────────────┤
+ *   │ Category             │ Mandatory → pre-checked in UI                  │
+ *   │                      │ Optional  → unchecked, test checks it          │
+ *   └──────────────────────┴─────────────────────────────────────────────────┘
  *
- *   From the returned SubmissionContext the spec derives:
- *     submissionUrl  ← ctx.submissionUrl
- *     product        ← ctx.formData?.products?.[0]   (falls back to PRODUCT env var)
- *     subSegment     ← ctx.formData?.subLob           (falls back to SUB_SEGMENT env var)
- *     state          ← ctx.formData?.insured?.state   (falls back to STATE env var)
+ * ── GROUPING STRATEGY ────────────────────────────────────────────────────────
  *
- * ── WHAT REMAINS AS STATIC CONFIG ────────────────────────────────────────────
+ *   Step 1  getAllForms() — read every row from Excel; no env-var filtering.
  *
- *   FIXTURE_PATH   Path to the Excel fixture file
- *                  (default: test-data/forms-fixture.xlsx)
- *   TRANSACTION    Quote | Binder | Policy — which lifecycle step you are testing
- *                  (default: not filtered — all transactions)
- *   FORMSET        Optional: restrict to one formset name
- *                  (default: all formsets)
- *   ROLE           GBO | CUO | UW — role to authenticate with
- *                  (default: GBO)
- *   CONTEXT_LABEL  Key under test-data/contexts/ for caching
- *                  (default: forms-ui-<TRANSACTION or "all">)
- *   REUSE_CONTEXT  true | false — reuse cached context (default: true)
+ *   Step 2  Filter by state — keep only forms where statesApplicable
+ *           includes 'ALL' or the submission's insured state.
+ *           State comes from SubmissionContext.formData.insured.state.
  *
- * ── WHAT THE UI LOOKS LIKE (from screenshots) ─────────────────────────────────
+ *   Step 3  Build FormGroup[] — one entry per unique (transaction × formset):
  *
- *   Step 02 "Forms" of the quote wizard has three sections:
+ *           FormGroup {
+ *             transaction:  'Quote'              ← from Excel Transaction column
+ *             formset:      "Builder's Risk"     ← from Excel Formset column
+ *             mandatory:    FixtureFormEntry[]   ← Category = Mandatory
+ *             optional:     FixtureFormEntry[]   ← Category = Optional
+ *           }
  *
- *   ┌─ Form Sets ────────────────────────────────────────────────────────────┐
- *   │  ● Builder's Risk   (radio buttons, one per formset)                   │
- *   └────────────────────────────────────────────────────────────────────────┘
- *   ┌─ Mandatory Forms ──────────────────────────────────────────────────────┐
- *   │  ☑ CDRC2067 03 18 - ELECTRONIC DELIVERY OF POLICY                     │
- *   │  ☑ BR 4000DEC 11 15 - BUILDER'S RISK DECLARATIONS QTLR                │
- *   └────────────────────────────────────────────────────────────────────────┘
- *   ┌─ Optional Forms - Builder's Risk ──────────────────────────────────────┐
- *   │  ☐ IM 8010 08 15 - WINDSTORM AND HAIL DEDUCTIBLE ENDORSEMENT          │
- *   │  ☐ IM 8017 05 11 - INLAND MARINE NAMED STORM EXCLUSION                │
- *   │                                            [View Form Fields]          │
- *   └────────────────────────────────────────────────────────────────────────┘
+ *   Step 4  Tests iterate ALL groups → every transaction+formset the Excel
+ *           defines is validated automatically.  No env vars needed for
+ *           TRANSACTION or FORMSET.
  *
- *   After clicking "View Form Fields":
- *   ┌─ Form Fields ──────────────────────────────────────────────────────────┐
- *   │  Forms (left panel)         │  Form Fields: BR 4000DEC… (right panel) │
- *   │  ● BR 4000DEC…  👁          │  PROJECT NAME  [        ]               │
- *   │    TER 9015PHN… 👁          │  HARD COSTS    [        ]  $            │
- *   └────────────────────────────────────────────────────────────────────────┘
+ * ── EXAMPLE — what the Excel produces ────────────────────────────────────────
  *
- * ── DISPLAY LABEL FORMAT ─────────────────────────────────────────────────────
+ *   Excel rows (simplified):
+ *   ┌──────────┬───────────────────┬────────────┬───────────┬──────────────┐
+ *   │ Formset  │ Transaction       │ Form Name  │ Category  │ States       │
+ *   ├──────────┼───────────────────┼────────────┼───────────┼──────────────┤
+ *   │ Bldrs Rk │ Quote|Binder      │ BR 4000DEC │ Mandatory │ ALL          │
+ *   │ Bldrs Rk │ Quote             │ IM 8010    │ Optional  │ CA|TX        │
+ *   │ Bldrs Rk │ Policy            │ TER 9015   │ Mandatory │ ALL          │
+ *   └──────────┴───────────────────┴────────────┴───────────┴──────────────┘
  *
- *   "{Lotus Notes Form ID} - {Form Name}"
- *   e.g. "BR 4000DEC 11 15 - BUILDER'S RISK DECLARATIONS QTLR"
+ *   Submission insured state = "CA"
  *
- * ── WHAT IT TESTS ─────────────────────────────────────────────────────────────
+ *   FormGroups produced (all three pass the state filter):
+ *     { transaction: 'Quote',  formset: 'Bldrs Rk', mandatory: [BR4000], optional: [IM8010] }
+ *     { transaction: 'Binder', formset: 'Bldrs Rk', mandatory: [BR4000], optional: []       }
+ *     { transaction: 'Policy', formset: 'Bldrs Rk', mandatory: [TER9015], optional: []      }
  *
- *   Suite 1 — Form Set Radio Buttons
- *   Suite 2 — Mandatory Forms (pre-checked)
- *   Suite 3 — Optional Forms (select + verify)
- *   Suite 4 — Form Fields Panel (click → labels → fill → eye icon → PDF)
+ * ── SUBMISSION CONTEXT ───────────────────────────────────────────────────────
+ *
+ *   Provided by SubmissionSetupService.createAndStoreContext() in beforeAll.
+ *   Three resolution paths (in priority order):
+ *     1. Cached context in test-data/contexts/<CONTEXT_LABEL>.json
+ *     2. SUBMISSION_URL + SUBMISSION_ID env vars (CI override)
+ *     3. Full creation via AuthManager + storage-states/<role>.json
  *
  * ── RUN ───────────────────────────────────────────────────────────────────────
  *
- *   # Uses cached context (or creates one)
- *   TRANSACTION=Quote \
+ *   # All transactions and formsets from Excel
  *   npx playwright test tests/forms/forms-ui-validation.spec.ts --workers=1
  *
- *   # Point at an existing submission (CI override — bypasses AuthManager)
- *   SUBMISSION_URL=https://allianz-qa.../submissions/0213953708 \
+ *   # CI — point at an existing submission (bypasses AuthManager)
+ *   SUBMISSION_URL=https://allianz-qa.example.com/submissions/0213953708 \
  *   SUBMISSION_ID=0213953708 \
- *   TRANSACTION=Quote \
  *   npx playwright test tests/forms/forms-ui-validation.spec.ts --workers=1
  *
- *   # One formset only
- *   FORMSET="Builder's Risk" TRANSACTION=Quote \
+ *   # Only Suite 2 (Mandatory Forms)
+ *   npx playwright test tests/forms/forms-ui-validation.spec.ts \
+ *     --grep "Suite 2" --workers=1
+ *
+ *   # Mock PDF comparison (no live viewer needed)
+ *   USE_MOCK_PDF=true \
  *   npx playwright test tests/forms/forms-ui-validation.spec.ts --workers=1
  *
- *   # Mock PDF mode (no live PDF viewer needed)
- *   USE_MOCK_PDF=true TRANSACTION=Quote \
- *   npx playwright test tests/forms/forms-ui-validation.spec.ts --workers=1
+ * ── ENV VARIABLES ─────────────────────────────────────────────────────────────
+ *
+ *   Required (one of):
+ *     SUBMISSION_URL + SUBMISSION_ID   CI direct-submission override
+ *     storage-states/gbo.json          Login state for full submission creation
+ *
+ *   Optional:
+ *     FIXTURE_PATH        Path to Excel fixture (default: test-data/forms-fixture.xlsx)
+ *     ROLE                GBO | CUO | UW (default: GBO)
+ *     CONTEXT_LABEL       Cache key under test-data/contexts/ (default: forms-ui)
+ *     REUSE_CONTEXT       true | false — reuse cached context (default: true)
+ *     USE_MOCK_PDF        true → compare PDF files locally
+ *     MOCK_PDF_DIR        Base dir for mock PDFs (default: test-data/mock-pdfs)
+ *     MOCK_PDF_TEMPLATE_DIR  Override template PDF dir
+ *     MOCK_PDF_PREVIEW_DIR   Override preview PDF dir
  */
 
 import { test, expect }              from '@playwright/test';
@@ -103,43 +121,102 @@ import { MockPdfValidator }          from '../../src/utils/MockPdfValidator';
 import type { SubmissionContext }    from '../../src/types/submission.types';
 import type { FixtureFormEntry }     from '../../src/helpers/ExcelFixtureReader';
 
-// ── Static config (file paths + lifecycle step) ───────────────────────────────
-// These never come from the submission — they describe which test run this is.
+// ── Static config ─────────────────────────────────────────────────────────────
+// TRANSACTION and FORMSET are NOT env vars — they come from Excel.
 
 const FIXTURE_PATH = process.env.FIXTURE_PATH
   ?? path.resolve(process.cwd(), 'test-data', 'forms-fixture.xlsx');
-
-const TRANSACTION = process.env.TRANSACTION;         // Quote | Binder | Policy | undefined
-const FORMSET     = process.env.FORMSET;             // optional: restrict to one formset
 
 const ROLE = (() => {
   const r = (process.env.ROLE ?? 'GBO').toUpperCase();
   return r === 'CUO' ? Role.CUO : r === 'UW' ? Role.UW : Role.GBO;
 })();
 
-const CONTEXT_LABEL   = process.env.CONTEXT_LABEL
-  ?? `forms-ui-${TRANSACTION?.toLowerCase() ?? 'all'}`;
-const REUSE_CONTEXT   = process.env.REUSE_CONTEXT !== 'false';
+const CONTEXT_LABEL = process.env.CONTEXT_LABEL ?? 'forms-ui';
+const REUSE_CONTEXT = process.env.REUSE_CONTEXT !== 'false';
 
-// ── Mock PDF config ───────────────────────────────────────────────────────────
-
-const USE_MOCK_PDF  = process.env.USE_MOCK_PDF === 'true';
-const _mockPdfBase  = process.env.MOCK_PDF_DIR
-  ?? path.resolve(process.cwd(), 'test-data', 'mock-pdfs');
+const USE_MOCK_PDF      = process.env.USE_MOCK_PDF === 'true';
+const _mockPdfBase      = process.env.MOCK_PDF_DIR ?? path.resolve(process.cwd(), 'test-data', 'mock-pdfs');
 const MOCK_PDF_TEMPLATE = process.env.MOCK_PDF_TEMPLATE_DIR ?? path.join(_mockPdfBase, 'template');
 const MOCK_PDF_PREVIEW  = process.env.MOCK_PDF_PREVIEW_DIR  ?? path.join(_mockPdfBase, 'preview');
+
+// ── FormGroup type ────────────────────────────────────────────────────────────
+
+/**
+ * One entry per unique (transaction × formset) pair found in the Excel.
+ * Built by buildFormGroups() after filtering by the submission's state.
+ */
+interface FormGroup {
+  transaction: string;           // e.g. 'Quote'
+  formset:     string;           // e.g. "Builder's Risk"
+  mandatory:   FixtureFormEntry[]; // Category = Mandatory, state-filtered
+  optional:    FixtureFormEntry[]; // Category = Optional,  state-filtered
+}
 
 // ── Shared state (populated in beforeAll) ─────────────────────────────────────
 
 let submissionCtx: SubmissionContext;
-let forms: FixtureFormEntry[] = [];
+let formGroups:    FormGroup[] = [];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Core grouping helper ──────────────────────────────────────────────────────
 
 /**
- * Display label as it appears in the UI:
- *   "{Lotus Notes Form ID} - {Form Name}"
- *   e.g. "BR 4000DEC 11 15 - BUILDER'S RISK DECLARATIONS QTLR"
+ * Reads ALL forms from the Excel fixture, filters to those applicable for
+ * the submission's insured state, then groups by (transaction × formset).
+ *
+ * This is the single source of truth for what gets tested.  No env vars.
+ *
+ * @param submissionState  The insured state from SubmissionContext (e.g. 'CA').
+ *                         Pass undefined to skip state filtering (all states).
+ */
+async function buildFormGroups(submissionState?: string): Promise<FormGroup[]> {
+  const reader = new ExcelFixtureReader(FIXTURE_PATH);
+  const allForms = await reader.getAllForms();
+
+  // Step 1 — Filter by state
+  //   Keep the form if it lists 'ALL' or if its states include the submission state.
+  const stateForms = submissionState
+    ? allForms.filter(form => {
+        const states = form.statesApplicable.map(s => s.toUpperCase());
+        return states.includes('ALL') || states.includes(submissionState.toUpperCase());
+      })
+    : allForms;
+
+  // Step 2 — Expand by transaction and group by (transaction × formset)
+  //   Each form can belong to multiple transactions (pipe-separated in Excel).
+  //   e.g. transactions: ['Quote', 'Binder'] → contributes to both groups.
+  const groupMap = new Map<string, FormGroup>();
+
+  for (const form of stateForms) {
+    for (const transaction of form.transactions) {
+      const key = `${transaction}||${form.formset}`;
+      if (!groupMap.has(key)) {
+        groupMap.set(key, { transaction, formset: form.formset, mandatory: [], optional: [] });
+      }
+      const group = groupMap.get(key)!;
+      if (form.category === 'Mandatory') {
+        group.mandatory.push(form);
+      } else {
+        group.optional.push(form);
+      }
+    }
+  }
+
+  // Step 3 — Sort groups: by transaction then by formset (stable, predictable order)
+  return Array.from(groupMap.values()).sort((a, b) => {
+    const txOrder = ['Quote', 'Binder', 'Policy'];
+    const ta = txOrder.indexOf(a.transaction);
+    const tb = txOrder.indexOf(b.transaction);
+    if (ta !== tb) return ta - tb;
+    return a.formset.localeCompare(b.formset);
+  });
+}
+
+// ── Display label helper ──────────────────────────────────────────────────────
+
+/**
+ * UI display label format: "{Lotus Notes Form ID} - {Form Name}"
+ * e.g. "BR 4000DEC 11 15 - BUILDER'S RISK DECLARATIONS QTLR"
  */
 function displayLabel(form: FixtureFormEntry): string {
   return form.lotusFormId
@@ -147,75 +224,50 @@ function displayLabel(form: FixtureFormEntry): string {
     : form.formName;
 }
 
-/** Returns unique formset names in fixture order */
-function uniqueFormsets(all: FixtureFormEntry[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const f of all) {
-    if (f.formset && !seen.has(f.formset)) { seen.add(f.formset); result.push(f.formset); }
-  }
-  return result;
-}
+// ── Page locator helpers ──────────────────────────────────────────────────────
 
-// ── Page locators ─────────────────────────────────────────────────────────────
+type PW = import('@playwright/test').Page;
 
-function formsetRadio(page: Parameters<typeof test>[1] extends (...args: infer A) => any ? never : never, formsetName: string) {
-  // typed inline in callers — see usages below
-  return (page as import('@playwright/test').Page)
+function formsetRadio(page: PW, formsetName: string) {
+  return page
     .getByRole('radio', { name: formsetName })
-    .or((page as import('@playwright/test').Page).locator('label').filter({ hasText: formsetName }).locator('input[type="radio"]'))
+    .or(page.locator('label').filter({ hasText: formsetName }).locator('input[type="radio"]'))
     .first();
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GLOBAL SETUP — create / reuse submission context, load fixture data
-// ══════════════════════════════════════════════════════════════════════════════
+function formRow(page: PW, label: string) {
+  return page
+    .locator('label, li, tr, div[class*="form-item"], div[class*="formItem"]')
+    .filter({ hasText: label })
+    .first();
+}
 
-test.beforeAll(async ({ browser }) => {
-  // 1. Obtain (or create) the submission context
-  submissionCtx = await SubmissionSetupService.createAndStoreContext(
-    browser,
-    ROLE,
-    { label: CONTEXT_LABEL, reuseExisting: REUSE_CONTEXT },
-  );
-  console.log(
-    `[forms-ui] Submission: ${submissionCtx.submissionId} — ${submissionCtx.submissionUrl}`,
-  );
+function formCheckbox(page: PW, label: string) {
+  return formRow(page, label).locator('input[type="checkbox"]').first();
+}
 
-  // 2. Derive filter parameters from the submission context.
-  //    formData carries the product, sub-segment and state used at creation time.
-  //    Env-var overrides are accepted as a fallback for cases where formData
-  //    is absent (e.g. a context created from SUBMISSION_URL+SUBMISSION_ID only).
-  const product    = submissionCtx.formData?.products?.[0]   ?? process.env.PRODUCT;
-  const subSegment = submissionCtx.formData?.subLob           ?? process.env.SUB_SEGMENT;
-  const state      = submissionCtx.formData?.insured?.state   ?? process.env.STATE;
+function formInLeftPanel(page: PW, label: string) {
+  return page
+    .locator(
+      'section[class*="form-fields"], div[class*="FormFields"], div[class*="form-fields"],' +
+      ' section, div',
+    )
+    .filter({ hasText: 'Form Fields' })
+    .first()
+    .locator('li, div[class*="form-item"], div[class*="formItem"], div[class*="form-row"]')
+    .filter({ hasText: label })
+    .first();
+}
 
-  // 3. Load Excel fixture, filtered to exactly what this submission covers
-  const reader = new ExcelFixtureReader(FIXTURE_PATH);
-  const opts: Parameters<typeof reader.getForms>[0] = {};
-  if (TRANSACTION) opts.transaction = TRANSACTION;
-  if (product)     opts.product     = product;
-  if (subSegment)  opts.subSegment  = subSegment;
-  if (state)       opts.state       = state;
+function eyeIconFor(page: PW, label: string) {
+  return formInLeftPanel(page, label)
+    .locator('button, [role="button"], svg, [data-testid*="eye"], [aria-label*="preview"]')
+    .last();
+}
 
-  const all = (TRANSACTION || product || subSegment || state)
-    ? await reader.getForms(opts)
-    : await reader.getAllForms();
+// ── Navigation helper ─────────────────────────────────────────────────────────
 
-  forms = FORMSET ? all.filter(f => f.formset === FORMSET) : all;
-
-  console.log(
-    `[forms-ui] Loaded ${forms.length} forms from fixture` +
-    (TRANSACTION ? ` (${TRANSACTION})` : '') +
-    (product     ? ` / ${product}`     : '') +
-    (subSegment  ? ` / ${subSegment}`  : '') +
-    (state       ? ` / ${state}`       : ''),
-  );
-});
-
-// ── Navigate to Forms tab helper ──────────────────────────────────────────────
-
-async function navigateToFormsTab(page: import('@playwright/test').Page): Promise<void> {
+async function navigateToFormsTab(page: PW): Promise<void> {
   await page.goto(submissionCtx.submissionUrl);
   await page.waitForLoadState('networkidle');
   await page
@@ -227,41 +279,59 @@ async function navigateToFormsTab(page: import('@playwright/test').Page): Promis
   await page.waitForLoadState('networkidle');
 }
 
-// ── Shared locator helpers ────────────────────────────────────────────────────
-
-function formRow(page: import('@playwright/test').Page, label: string) {
-  return page
-    .locator('label, li, tr, div[class*="form-item"], div[class*="formItem"]')
-    .filter({ hasText: label })
-    .first();
-}
-
-function formCheckbox(page: import('@playwright/test').Page, label: string) {
-  return formRow(page, label).locator('input[type="checkbox"]').first();
-}
-
-function formInLeftPanel(page: import('@playwright/test').Page, label: string) {
-  const panel = page
-    .locator(
-      'section[class*="form-fields"], div[class*="FormFields"], div[class*="form-fields"],' +
-      ' section, div',
-    )
-    .filter({ hasText: 'Form Fields' })
-    .first();
-  return panel
-    .locator('li, div[class*="form-item"], div[class*="formItem"], div[class*="form-row"]')
-    .filter({ hasText: label })
-    .first();
-}
-
-function eyeIconFor(page: import('@playwright/test').Page, label: string) {
-  return formInLeftPanel(page, label)
-    .locator('button, [role="button"], svg, [data-testid*="eye"], [aria-label*="preview"]')
-    .last();
+/**
+ * Select a formset radio button and check all optional forms for it.
+ * Called at the start of Suite 3 and 4 to put the UI in the right state.
+ */
+async function selectFormsetAndOptionals(page: PW, group: FormGroup): Promise<void> {
+  const radio = formsetRadio(page, group.formset);
+  if (await radio.isVisible().catch(() => false)) {
+    await radio.click();
+    await page.waitForLoadState('networkidle');
+  }
+  for (const form of group.optional) {
+    const cb = formCheckbox(page, displayLabel(form));
+    if (await cb.isVisible().catch(() => false) && !(await cb.isChecked().catch(() => false))) {
+      await cb.check();
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// GLOBAL SETUP
+// Creates/reuses submission context and builds FormGroup[] from Excel
+// ══════════════════════════════════════════════════════════════════════════════
+
+test.beforeAll(async ({ browser }) => {
+  // 1. Create or reuse submission context
+  submissionCtx = await SubmissionSetupService.createAndStoreContext(
+    browser,
+    ROLE,
+    { label: CONTEXT_LABEL, reuseExisting: REUSE_CONTEXT },
+  );
+  console.log(
+    `[forms-ui] Submission ${submissionCtx.submissionId} → ${submissionCtx.submissionUrl}`,
+  );
+
+  // 2. Build form groups — Excel drives what gets tested
+  //    State from submission context is the ONLY filter applied here.
+  const submissionState = submissionCtx.formData?.insured?.state;
+  formGroups = await buildFormGroups(submissionState);
+
+  // Log the groups so the run log makes it obvious what will be tested
+  console.log(`[forms-ui] State filter: ${submissionState ?? 'none (all states)'}`);
+  console.log(`[forms-ui] Form groups from Excel (${formGroups.length} total):`);
+  for (const g of formGroups) {
+    console.log(
+      `  • [${g.transaction}] ${g.formset}` +
+      ` — ${g.mandatory.length} mandatory, ${g.optional.length} optional`,
+    );
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Suite 1 — Form Set Radio Buttons
+// Verifies that every formset defined in Excel has a radio button in the UI.
 // ══════════════════════════════════════════════════════════════════════════════
 
 test.describe('Suite 1 — Form Set Radio Buttons', () => {
@@ -270,31 +340,27 @@ test.describe('Suite 1 — Form Set Radio Buttons', () => {
     await navigateToFormsTab(page);
   });
 
-  test('All formsets from Excel have a radio button in the UI', async ({ page }) => {
-    const formsets = uniqueFormsets(forms);
-    test.skip(formsets.length === 0, 'No formsets found in fixture for current filters');
+  test('Every formset from Excel has a visible radio button', async ({ page }) => {
+    test.skip(formGroups.length === 0, 'No form groups built from fixture');
 
-    for (const fs of formsets) {
-      const radio = page
-        .getByRole('radio', { name: fs })
-        .or(page.locator('label').filter({ hasText: fs }).locator('input[type="radio"]'))
-        .first();
+    // Collect unique formsets across all groups (a formset may appear in multiple transactions)
+    const uniqueFormsets = [...new Set(formGroups.map(g => g.formset))];
+
+    for (const formset of uniqueFormsets) {
+      const radio = formsetRadio(page, formset);
       await expect(radio).toBeVisible({
         timeout: 8_000,
-        message: `Formset radio "${fs}" not visible`,
+        message: `Formset radio "${formset}" not found in UI (defined in Excel Formset column)`,
       });
     }
   });
 
   test('Selecting a formset radio marks it as checked', async ({ page }) => {
-    const formsets = uniqueFormsets(forms);
-    test.skip(formsets.length === 0, 'No formsets in fixture');
+    test.skip(formGroups.length === 0, 'No form groups built from fixture');
 
-    for (const fs of formsets) {
-      const radio = page
-        .getByRole('radio', { name: fs })
-        .or(page.locator('label').filter({ hasText: fs }).locator('input[type="radio"]'))
-        .first();
+    const uniqueFormsets = [...new Set(formGroups.map(g => g.formset))];
+    for (const formset of uniqueFormsets) {
+      const radio = formsetRadio(page, formset);
       await radio.click();
       await expect(radio).toBeChecked({ timeout: 5_000 });
     }
@@ -303,6 +369,8 @@ test.describe('Suite 1 — Form Set Radio Buttons', () => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Suite 2 — Mandatory Forms
+// For each (transaction × formset) group: every Mandatory form from Excel
+// must appear in the UI with its display label and be pre-checked.
 // ══════════════════════════════════════════════════════════════════════════════
 
 test.describe('Suite 2 — Mandatory Forms', () => {
@@ -311,295 +379,300 @@ test.describe('Suite 2 — Mandatory Forms', () => {
     await navigateToFormsTab(page);
   });
 
-  test('All mandatory forms appear with correct display label', async ({ page }) => {
-    const mandatory = forms.filter(f => f.category === 'Mandatory');
-    test.skip(mandatory.length === 0, 'No mandatory forms in fixture');
+  test('All mandatory forms appear with correct display label and are pre-checked',
+    async ({ page }) => {
+      const groupsWithMandatory = formGroups.filter(g => g.mandatory.length > 0);
+      test.skip(groupsWithMandatory.length === 0, 'No mandatory forms in fixture');
 
-    for (const form of mandatory) {
-      await expect(page.getByText(displayLabel(form), { exact: false }).first()).toBeVisible({
-        timeout: 8_000,
-        message: `Mandatory form not visible: "${displayLabel(form)}"`,
-      });
-    }
-  });
+      for (const group of groupsWithMandatory) {
+        // Select the formset radio so this group's forms are visible
+        const radio = formsetRadio(page, group.formset);
+        if (await radio.isVisible().catch(() => false)) {
+          await radio.click();
+          await page.waitForLoadState('networkidle');
+        }
 
-  test('All mandatory forms are pre-checked', async ({ page }) => {
-    const mandatory = forms.filter(f => f.category === 'Mandatory');
-    test.skip(mandatory.length === 0, 'No mandatory forms in fixture');
+        for (const form of group.mandatory) {
+          const label = displayLabel(form);
 
-    for (const form of mandatory) {
-      const cb = formCheckbox(page, displayLabel(form));
-      await expect(cb).toBeChecked({
-        timeout: 6_000,
-        message: `Mandatory form "${displayLabel(form)}" should be pre-checked`,
-      });
-    }
-  });
+          // Label is visible
+          await expect(page.getByText(label, { exact: false }).first()).toBeVisible({
+            timeout: 8_000,
+            message:
+              `[${group.transaction} / ${group.formset}] ` +
+              `Mandatory form not visible: "${label}"`,
+          });
 
-  test('Mandatory form count in UI matches fixture', async ({ page }) => {
-    const mandatory = forms.filter(f => f.category === 'Mandatory');
-    test.skip(mandatory.length === 0, 'No mandatory forms in fixture');
-
-    const section = page
-      .locator('section, div, h3, h4')
-      .filter({ hasText: /mandatory forms/i })
-      .first();
-    await expect(section).toBeVisible({ timeout: 8_000 });
-
-    const rows = section.locator('label, li, [class*="form-item"]');
-    const uiCount = await rows.count();
-    expect(uiCount).toBeGreaterThanOrEqual(mandatory.length,
-      `UI shows ${uiCount} mandatory forms; fixture defines ${mandatory.length}`);
-  });
+          // Checkbox is pre-checked
+          const cb = formCheckbox(page, label);
+          await expect(cb).toBeChecked({
+            timeout: 6_000,
+            message:
+              `[${group.transaction} / ${group.formset}] ` +
+              `Mandatory form "${label}" should be pre-checked`,
+          });
+        }
+      }
+    });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Suite 3 — Optional Forms (select + verify)
+// For each (transaction × formset) group: every Optional form from Excel
+// must appear unchecked, then the test checks it.
 // ══════════════════════════════════════════════════════════════════════════════
 
 test.describe('Suite 3 — Optional Forms (select + verify)', () => {
 
   test.beforeEach(async ({ page }) => {
     await navigateToFormsTab(page);
-    // Select all formsets so all optional forms are visible
-    for (const fs of uniqueFormsets(forms)) {
-      const radio = page
-        .getByRole('radio', { name: fs })
-        .or(page.locator('label').filter({ hasText: fs }).locator('input[type="radio"]'))
-        .first();
-      if (await radio.isVisible().catch(() => false)) await radio.click();
-    }
-    await page.waitForLoadState('networkidle');
   });
 
-  test('All optional forms from Excel appear in the Optional Forms section', async ({ page }) => {
-    const optional = forms.filter(f => f.category === 'Optional');
-    test.skip(optional.length === 0, 'No optional forms in fixture');
+  test('All optional forms appear unchecked, then can be selected', async ({ page }) => {
+    const groupsWithOptional = formGroups.filter(g => g.optional.length > 0);
+    test.skip(groupsWithOptional.length === 0, 'No optional forms in fixture');
 
-    for (const form of optional) {
-      await expect(page.getByText(displayLabel(form), { exact: false }).first()).toBeVisible({
-        timeout: 8_000,
-        message: `Optional form not visible: "${displayLabel(form)}"`,
-      });
-    }
-  });
-
-  test('Optional forms are unchecked by default', async ({ page }) => {
-    const optional = forms.filter(f => f.category === 'Optional');
-    test.skip(optional.length === 0, 'No optional forms in fixture');
-
-    for (const form of optional) {
-      const cb = formCheckbox(page, displayLabel(form));
-      if (!(await cb.isVisible().catch(() => false))) continue;
-      await expect(cb).not.toBeChecked({
-        message: `Optional form "${displayLabel(form)}" should start unchecked`,
-      });
-    }
-  });
-
-  test('Checking an optional form marks it as selected', async ({ page }) => {
-    const optional = forms.filter(f => f.category === 'Optional');
-    test.skip(optional.length === 0, 'No optional forms in fixture');
-
-    for (const form of optional) {
-      const cb = formCheckbox(page, displayLabel(form));
-      if (!(await cb.isVisible().catch(() => false))) {
-        console.warn(`  ⚠  Checkbox not visible: "${displayLabel(form)}" — skipping`);
-        continue;
+    for (const group of groupsWithOptional) {
+      // Select the formset radio so this group's forms are visible
+      const radio = formsetRadio(page, group.formset);
+      if (await radio.isVisible().catch(() => false)) {
+        await radio.click();
+        await page.waitForLoadState('networkidle');
       }
-      await cb.check();
-      await expect(cb).toBeChecked({
-        timeout: 5_000,
-        message: `Optional form "${displayLabel(form)}" should be checked after clicking`,
-      });
+
+      for (const form of group.optional) {
+        const label = displayLabel(form);
+        const cb    = formCheckbox(page, label);
+
+        if (!(await cb.isVisible().catch(() => false))) {
+          console.warn(
+            `  ⚠  [${group.transaction} / ${group.formset}] ` +
+            `Optional form checkbox not visible: "${label}" — skipping`,
+          );
+          continue;
+        }
+
+        // Must start unchecked
+        await expect(cb).not.toBeChecked({
+          message:
+            `[${group.transaction} / ${group.formset}] ` +
+            `Optional form "${label}" should start unchecked`,
+        });
+
+        // Check it
+        await cb.check();
+        await expect(cb).toBeChecked({
+          timeout: 5_000,
+          message:
+            `[${group.transaction} / ${group.formset}] ` +
+            `Optional form "${label}" should be checked after clicking`,
+        });
+      }
     }
   });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Suite 4 — Form Fields Panel (full end-to-end)
+// For each (transaction × formset) group:
+//   • Select the formset + check optional forms
+//   • Click "View Form Fields" to open the panel
+//   • Click each form in the left panel → verify field labels on the right
+//   • Fill all fields with Test Data from Excel
+//   • Click the eye icon (👁) → verify PDF viewer opens
+//   • (USE_MOCK_PDF=true) compare template {{variables}} vs preview PDF
 // ══════════════════════════════════════════════════════════════════════════════
 
 test.describe('Suite 4 — Form Fields Panel', () => {
 
-  test.beforeEach(async ({ page }) => {
+  // ── 4-A: Panel opens ──────────────────────────────────────────────────────
+
+  test('"View Form Fields" opens the panel', async ({ page }) => {
+    test.skip(formGroups.length === 0, 'No form groups in fixture');
+
     await navigateToFormsTab(page);
 
-    // Select every formset, check all optional forms
-    for (const fs of uniqueFormsets(forms)) {
-      const radio = page
-        .getByRole('radio', { name: fs })
-        .or(page.locator('label').filter({ hasText: fs }).locator('input[type="radio"]'))
-        .first();
-      if (await radio.isVisible().catch(() => false)) await radio.click();
-      await page.waitForLoadState('networkidle');
+    // Set up the first group that has any forms
+    const group = formGroups[0];
+    await selectFormsetAndOptionals(page, group);
 
-      for (const form of forms.filter(f => f.formset === fs && f.category === 'Optional')) {
-        const cb = formCheckbox(page, displayLabel(form));
-        const vis = await cb.isVisible().catch(() => false);
-        if (vis && !(await cb.isChecked().catch(() => false))) await cb.check();
-      }
-    }
-
-    // Open the Form Fields panel
     const viewBtn = page
       .getByRole('button', { name: /view form fields/i })
       .or(page.getByText('View Form Fields').first());
     await viewBtn.click();
     await page.waitForLoadState('networkidle');
-  });
 
-  test('"View Form Fields" opens the Form Fields panel', async ({ page }) => {
     const panel = page.locator('section, div').filter({ hasText: 'Form Fields' }).last();
     await expect(panel).toBeVisible({ timeout: 10_000 });
   });
 
-  test('All selected forms appear in the left panel list', async ({ page }) => {
-    test.skip(forms.length === 0, 'No forms in fixture');
-    for (const form of forms) {
-      await expect(page.getByText(displayLabel(form), { exact: false }).first()).toBeVisible({
-        timeout: 8_000,
-        message: `Form "${displayLabel(form)}" not visible in left panel`,
-      });
-    }
-  });
+  // ── 4-B: Field labels + fill + eye icon — per group ───────────────────────
 
-  test('Clicking a form in the left panel loads its field labels on the right', async ({ page }) => {
-    const withFields = forms.filter(f => f.fields.length > 0);
-    test.skip(withFields.length === 0, 'No forms with fields in fixture');
+  test('Field labels, fill and eye icon — all groups from Excel', async ({ page }) => {
+    test.skip(formGroups.length === 0, 'No form groups in fixture');
 
-    const form = withFields[0];
-    await formInLeftPanel(page, displayLabel(form)).click();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-
-    for (const field of form.fields.slice(0, 5)) {
-      if (!field.formField) continue;
-      await expect(page.getByText(field.formField, { exact: false }).first()).toBeVisible({
-        timeout: 6_000,
-        message: `Field "${field.formField}" not visible in right panel for "${displayLabel(form)}"`,
-      });
-    }
-  });
-
-  test('Fill all form fields using Test Data from Excel', async ({ page }) => {
     const reader = new ExcelFixtureReader(FIXTURE_PATH);
 
-    for (const form of forms) {
-      if (form.fields.length === 0) continue;
-      const label    = displayLabel(form);
-      const leftItem = formInLeftPanel(page, label);
-      if (!(await leftItem.isVisible().catch(() => false))) {
-        console.warn(`  ⚠  Not visible in left panel: "${label}" — skipping`);
+    for (const group of formGroups) {
+      const allForms = [...group.mandatory, ...group.optional];
+      const formsWithFields = allForms.filter(f => f.fields.length > 0);
+      if (formsWithFields.length === 0) continue;
+
+      // Navigate fresh for each group so the UI state is clean
+      await navigateToFormsTab(page);
+      await selectFormsetAndOptionals(page, group);
+
+      // Open Form Fields panel
+      const viewBtn = page
+        .getByRole('button', { name: /view form fields/i })
+        .or(page.getByText('View Form Fields').first());
+      if (!(await viewBtn.isVisible().catch(() => false))) {
+        console.warn(
+          `  ⚠  [${group.transaction} / ${group.formset}] ` +
+          `"View Form Fields" button not visible — skipping group`,
+        );
         continue;
       }
-      await leftItem.click();
-      await page.waitForTimeout(500);
+      await viewBtn.click();
+      await page.waitForLoadState('networkidle');
 
-      for (const { selector, value, fieldType } of reader.buildFillMap(form)) {
-        if (!selector || !value || fieldType === 'statement') continue;
-        let filled = false;
-        for (const sel of selector.split(',').map(s => s.trim()).filter(Boolean)) {
-          const el = page.locator(sel).first();
-          if (!(await el.isVisible().catch(() => false))) continue;
-          try {
-            switch (fieldType.toLowerCase()) {
-              case 'checkbox':
-                ['yes', 'true', '1'].includes(value.toLowerCase()) ? await el.check() : await el.uncheck();
-                break;
-              case 'radio':
-                await page.getByRole('radio', { name: value }).first().click();
-                break;
-              case 'dropdown':
-                await el.selectOption({ label: value }).catch(() => el.selectOption({ value }));
-                break;
-              case 'date':
-                await el.fill(value); await el.press('Tab');
-                break;
-              default:
-                await el.fill(value);
+      for (const form of formsWithFields) {
+        const label    = displayLabel(form);
+        const leftItem = formInLeftPanel(page, label);
+
+        if (!(await leftItem.isVisible().catch(() => false))) {
+          console.warn(
+            `  ⚠  [${group.transaction} / ${group.formset}] ` +
+            `Form not in left panel: "${label}" — skipping`,
+          );
+          continue;
+        }
+
+        // Click form in left panel → loads its fields on the right
+        await leftItem.click();
+        await page.waitForTimeout(500);
+
+        // Verify field labels (first 5 — full set may be slow)
+        for (const field of form.fields.slice(0, 5)) {
+          if (!field.formField) continue;
+          await expect(page.getByText(field.formField, { exact: false }).first()).toBeVisible({
+            timeout: 6_000,
+            message:
+              `[${group.transaction} / ${group.formset}] ` +
+              `Field label "${field.formField}" not visible in right panel for "${label}"`,
+          });
+        }
+
+        // Fill fields with Test Data from Excel
+        for (const { selector, value, fieldType } of reader.buildFillMap(form)) {
+          if (!selector || !value || fieldType === 'statement') continue;
+          let filled = false;
+          for (const sel of selector.split(',').map(s => s.trim()).filter(Boolean)) {
+            const el = page.locator(sel).first();
+            if (!(await el.isVisible().catch(() => false))) continue;
+            try {
+              switch (fieldType.toLowerCase()) {
+                case 'checkbox':
+                  ['yes', 'true', '1'].includes(value.toLowerCase())
+                    ? await el.check() : await el.uncheck();
+                  break;
+                case 'radio':
+                  await page.getByRole('radio', { name: value }).first().click();
+                  break;
+                case 'dropdown':
+                  await el.selectOption({ label: value })
+                    .catch(() => el.selectOption({ value }));
+                  break;
+                case 'date':
+                  await el.fill(value); await el.press('Tab');
+                  break;
+                default:
+                  await el.fill(value);
+              }
+              filled = true;
+            } catch { /* try next fallback selector */ }
+            if (filled) break;
+          }
+          if (!filled) {
+            console.warn(
+              `  ⚠  [${group.transaction} / ${group.formset}] ` +
+              `Could not fill "${selector}" in "${label}"`,
+            );
+          }
+        }
+
+        // Eye icon → PDF viewer
+        if (!USE_MOCK_PDF) {
+          const eye = eyeIconFor(page, label);
+          if (await eye.isVisible().catch(() => false)) {
+            const newPagePromise = page.context().waitForEvent('page', { timeout: 10_000 }).catch(() => null);
+            await eye.click();
+            const newPage = await newPagePromise;
+            if (newPage) {
+              await newPage.waitForLoadState('domcontentloaded').catch(() => null);
+              expect(newPage.url().length > 0).toBe(true,
+                `Eye icon for "${label}" did not open a URL`);
+              await newPage.close();
             }
-            filled = true;
-          } catch { /* try next selector */ }
-          if (filled) break;
-        }
-        if (!filled) console.warn(`  ⚠  Could not fill "${selector}" in "${label}"`);
-      }
-    }
-  });
-
-  test('Eye icon (👁) opens the PDF viewer for each form', async ({ page }) => {
-    test.skip(forms.length === 0, 'No forms in fixture');
-    test.skip(USE_MOCK_PDF, 'Mock PDF mode — eye icon test requires live app');
-
-    for (const form of forms) {
-      const label    = displayLabel(form);
-      const leftItem = formInLeftPanel(page, label);
-      if (!(await leftItem.isVisible().catch(() => false))) continue;
-      await leftItem.click();
-      await page.waitForTimeout(400);
-
-      const newPagePromise = page.context().waitForEvent('page', { timeout: 10_000 }).catch(() => null);
-      const eye = eyeIconFor(page, label);
-      if (!(await eye.isVisible().catch(() => false))) {
-        console.warn(`  ⚠  Eye icon not visible for "${label}" — skipping`);
-        continue;
-      }
-      await eye.click();
-
-      const newPage = await newPagePromise;
-      if (newPage) {
-        await newPage.waitForLoadState('domcontentloaded').catch(() => null);
-        const url = newPage.url();
-        expect(url.length > 0).toBe(true, `Eye icon for "${label}" did not open a URL`);
-        await newPage.close();
-      } else {
-        const pdfFrame = page.locator('iframe[src*="pdf"], object[type="application/pdf"]').first();
-        if (!(await pdfFrame.isVisible().catch(() => false))) {
-          console.warn(`  ⚠  No new tab or PDF iframe detected for "${label}"`);
+          } else {
+            console.warn(
+              `  ⚠  [${group.transaction} / ${group.formset}] ` +
+              `Eye icon not visible for "${label}"`,
+            );
+          }
         }
       }
     }
   });
 
-  test('Mock PDF: template {{variables}} are replaced with Excel test data in preview', async () => {
+  // ── 4-C: Mock PDF comparison ──────────────────────────────────────────────
+
+  test('Mock PDF: template {{variables}} match Excel test data in preview PDF', async () => {
     test.skip(!USE_MOCK_PDF, 'Set USE_MOCK_PDF=true to run mock PDF comparison');
+    test.skip(formGroups.length === 0, 'No form groups in fixture');
 
     const reader   = new ExcelFixtureReader(FIXTURE_PATH);
     const failures: string[] = [];
 
-    for (const form of forms) {
-      const templatePath = path.join(MOCK_PDF_TEMPLATE, `${form.unqorkFormNumber}.pdf`);
-      const previewPath  = path.join(MOCK_PDF_PREVIEW,  `${form.unqorkFormNumber}.pdf`);
+    for (const group of formGroups) {
+      const allForms = [...group.mandatory, ...group.optional];
 
-      if (!fs.existsSync(templatePath) || !fs.existsSync(previewPath)) {
-        const miss = [
-          !fs.existsSync(templatePath) ? `template: ${path.basename(templatePath)}` : '',
-          !fs.existsSync(previewPath)  ? `preview: ${path.basename(previewPath)}`   : '',
-        ].filter(Boolean).join(', ');
-        console.warn(`  ⚠  ${form.unqorkFormNumber}: PDF file(s) missing (${miss}) — skipping`);
-        continue;
-      }
+      for (const form of allForms) {
+        const templatePath = path.join(MOCK_PDF_TEMPLATE, `${form.unqorkFormNumber}.pdf`);
+        const previewPath  = path.join(MOCK_PDF_PREVIEW,  `${form.unqorkFormNumber}.pdf`);
 
-      const values = reader.buildValuesMap(form);
-      const result = await MockPdfValidator.comparePdfs({
-        templatePdfPath:    templatePath,
-        previewPdfPath:     previewPath,
-        values,
-        requiredStatements: form.statements,
-      });
+        if (!fs.existsSync(templatePath) || !fs.existsSync(previewPath)) {
+          const miss = [
+            !fs.existsSync(templatePath) ? `template: ${path.basename(templatePath)}` : '',
+            !fs.existsSync(previewPath)  ? `preview: ${path.basename(previewPath)}`   : '',
+          ].filter(Boolean).join(', ');
+          console.warn(
+            `  ⚠  [${group.transaction} / ${group.formset}] ` +
+            `${form.unqorkFormNumber}: PDF(s) missing (${miss}) — skipping`,
+          );
+          continue;
+        }
 
-      MockPdfValidator.printReport(result);
+        const result = await MockPdfValidator.comparePdfs({
+          templatePdfPath:    templatePath,
+          previewPdfPath:     previewPath,
+          values:             reader.buildValuesMap(form),
+          requiredStatements: form.statements,
+        });
 
-      if (!result.passed) {
-        failures.push(
-          result.failures
-            .map(f => `  ✗ [${form.unqorkFormNumber}] ${f.label}: expected "${f.expected}" — got "${f.actual}"`)
-            .join('\n'),
-        );
+        MockPdfValidator.printReport(result);
+
+        if (!result.passed) {
+          failures.push(
+            result.failures.map(f =>
+              `  ✗ [${group.transaction} / ${group.formset} / ${form.unqorkFormNumber}] ` +
+              `${f.label}: expected "${f.expected}" — got "${f.actual}"`,
+            ).join('\n'),
+          );
+        }
       }
     }
 
-    expect(failures.length, `Mock PDF comparison failures:\n${failures.join('\n')}`).toBe(0);
+    expect(failures.length, `Mock PDF failures:\n${failures.join('\n')}`).toBe(0);
   });
 });
